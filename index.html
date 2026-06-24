@@ -1,0 +1,584 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="theme-color" content="#1F3864">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Pointage">
+<title>Pointage</title>
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='20' fill='%231F3864'/%3E%3Ccircle cx='50' cy='50' r='28' fill='none' stroke='white' stroke-width='4'/%3E%3Cline x1='50' y1='50' x2='50' y2='30' stroke='white' stroke-width='4' stroke-linecap='round'/%3E%3Cline x1='50' y1='50' x2='65' y2='55' stroke='white' stroke-width='4' stroke-linecap='round'/%3E%3Ccircle cx='50' cy='50' r='3' fill='white'/%3E%3C/svg%3E">
+<link rel="apple-touch-icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='20' fill='%231F3864'/%3E%3Ccircle cx='50' cy='50' r='28' fill='none' stroke='white' stroke-width='4'/%3E%3Cline x1='50' y1='50' x2='50' y2='30' stroke='white' stroke-width='4' stroke-linecap='round'/%3E%3Cline x1='50' y1='50' x2='65' y2='55' stroke='white' stroke-width='4' stroke-linecap='round'/%3E%3Ccircle cx='50' cy='50' r='3' fill='white'/%3E%3C/svg%3E">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+:root {
+  --bg: #FAFAF7; --paper: #FFFFFF; --ink: #1A1A1A; --muted: #6B6B66;
+  --hairline: #E5E2D8; --bg-soft: #F2F0E8; --brand: #1F3864; --work: #2D5F3F;
+  --break: #B8651D; --finish: #555555; --danger: #8B2515;
+  --c-under: #C73E1D; --c-close: #D48A19; --c-met: #2D5F3F;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+  background: var(--bg); color: var(--ink); line-height: 1.5;
+  font-feature-settings: 'tnum' 1; min-height: 100vh; padding: 16px;
+  padding-top: max(16px, env(safe-area-inset-top));
+  padding-bottom: max(16px, env(safe-area-inset-bottom));
+}
+.app { max-width: 520px; margin: 0 auto; }
+.eyebrow {
+  display: flex; justify-content: space-between; align-items: center;
+  font-size: 11px; letter-spacing: 0.15em; text-transform: uppercase;
+  color: var(--muted); padding-bottom: 12px;
+  border-bottom: 1px solid var(--hairline); margin-bottom: 28px;
+}
+.save-indicator { display: inline-flex; align-items: center; gap: 6px; }
+.save-indicator::before { content: ''; width: 6px; height: 6px; background: var(--work); border-radius: 50%; }
+.save-indicator.error::before { background: var(--danger); }
+.hero { text-align: center; padding: 28px 16px 24px; }
+.hero-label { font-size: 11px; letter-spacing: 0.2em; text-transform: uppercase; color: var(--muted); margin-bottom: 14px; }
+.hero-state {
+  font-family: 'Menlo', 'Consolas', monospace; font-size: 36px; font-weight: 700;
+  letter-spacing: -0.02em; line-height: 1.1; margin-bottom: 8px;
+}
+.hero-state.idle { color: var(--ink); }
+.hero-state.working { color: var(--work); }
+.hero-state.break { color: var(--break); }
+.hero-state.finished { color: var(--finish); }
+.hero-since { font-family: 'Menlo', 'Consolas', monospace; font-size: 14px; color: var(--muted); min-height: 1.5em; }
+.primary-action {
+  display: block; width: 100%; padding: 22px; font-size: 16px; font-weight: 600;
+  letter-spacing: 0.03em; text-transform: uppercase; background: var(--brand);
+  color: white; border: none; border-radius: 4px; cursor: pointer; margin-bottom: 10px;
+  -webkit-tap-highlight-color: transparent; transition: opacity 0.15s, transform 0.1s;
+}
+.primary-action:hover { opacity: 0.92; }
+.primary-action:active { transform: scale(0.98); }
+.primary-action.warn { background: var(--break); }
+.primary-action.success { background: var(--work); }
+.primary-action.danger { background: var(--danger); }
+.adjust-link {
+  text-align: center; font-size: 12px; color: var(--muted); margin-bottom: 30px;
+  display: block; background: none; border: none; width: 100%; cursor: pointer;
+  text-decoration: underline; padding: 6px;
+}
+.metrics { margin-bottom: 30px; }
+.metric {
+  padding: 16px 0; border-bottom: 1px solid var(--hairline); --color: var(--c-under);
+  display: grid; grid-template-columns: 1fr auto; gap: 6px 12px;
+}
+.metric.close { --color: var(--c-close); }
+.metric.met { --color: var(--c-met); }
+.metric.rest { --color: var(--muted); }
+.metric:last-child { border-bottom: 0; }
+.metric-label { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.1em; align-self: center; }
+.metric-pct { font-family: 'Menlo', 'Consolas', monospace; font-size: 26px; font-weight: 700; letter-spacing: -0.02em; color: var(--color); text-align: right; align-self: center; line-height: 1; }
+.metric-value { font-family: 'Menlo', 'Consolas', monospace; font-size: 15px; font-weight: 500; grid-column: 1 / -1; color: var(--ink); }
+.metric-target { color: var(--muted); font-weight: 400; }
+.metric-bar { grid-column: 1 / -1; height: 4px; background: var(--bg-soft); border-radius: 2px; margin-top: 4px; overflow: hidden; }
+.metric-bar > span { display: block; height: 100%; background: var(--color); transition: width 0.4s, background 0.3s; }
+.section-head {
+  display: flex; justify-content: space-between; align-items: center;
+  font-size: 11px; letter-spacing: 0.15em; text-transform: uppercase; color: var(--muted);
+  margin: 8px 0 8px; padding-top: 24px; border-top: 1px solid var(--hairline);
+}
+.section-head .link { cursor: pointer; text-decoration: underline; background: none; border: none; color: var(--muted); font: inherit; letter-spacing: inherit; text-transform: inherit; }
+.history { margin-bottom: 24px; }
+.day-block { padding: 8px 0 4px; }
+.day-block-head { font-size: 11px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--brand); padding: 10px 0 6px; font-weight: 600; display: flex; justify-content: space-between; }
+.day-block-total { font-family: 'Menlo', 'Consolas', monospace; color: var(--muted); }
+.history-row { display: grid; grid-template-columns: 64px 1fr auto; gap: 12px; padding: 8px 0; font-size: 14px; align-items: center; }
+.history-time { font-family: 'Menlo', 'Consolas', monospace; font-weight: 600; }
+.history-type { color: var(--ink); }
+.history-action { background: none; border: 1px solid var(--hairline); border-radius: 3px; padding: 4px 10px; font-size: 11px; color: var(--muted); cursor: pointer; letter-spacing: 0.05em; }
+.history-empty { padding: 28px 0; text-align: center; color: var(--muted); font-size: 13px; }
+.actions { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 16px; }
+.actions button { padding: 13px; font-size: 13px; background: var(--paper); color: var(--ink); border: 1px solid var(--hairline); border-radius: 4px; cursor: pointer; font-weight: 500; font-family: inherit; }
+.actions button:hover { background: var(--bg-soft); }
+.footer-actions { display: flex; justify-content: center; gap: 18px; padding-top: 16px; border-top: 1px solid var(--hairline); font-size: 11px; letter-spacing: 0.05em; flex-wrap: wrap; }
+.footer-actions button { background: none; border: none; color: var(--muted); cursor: pointer; text-decoration: underline; font-family: inherit; font-size: inherit; padding: 4px; }
+.footer-actions button.danger { color: var(--danger); }
+.modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.5); display: none; align-items: center; justify-content: center; padding: 20px; z-index: 1000; }
+.modal-overlay.open { display: flex; }
+.modal { background: var(--paper); border-radius: 6px; padding: 24px; width: 100%; max-width: 420px; max-height: 90vh; overflow-y: auto; }
+.modal h2 { font-size: 13px; text-transform: uppercase; letter-spacing: 0.15em; color: var(--brand); margin-bottom: 16px; font-weight: 700; }
+.modal label { display: block; font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 6px; margin-top: 14px; }
+.modal input, .modal select, .modal textarea { width: 100%; padding: 10px; border: 1px solid var(--hairline); border-radius: 4px; font-size: 15px; background: var(--bg); font-family: inherit; }
+.modal textarea { font-family: 'Menlo','Consolas',monospace; font-size: 11px; resize: vertical; }
+.modal-actions { display: flex; gap: 8px; margin-top: 20px; flex-wrap: wrap; }
+.modal-actions button { flex: 1; min-width: 90px; padding: 12px; border-radius: 4px; border: none; font-size: 13px; font-weight: 600; cursor: pointer; font-family: inherit; }
+.btn-cancel { background: var(--bg-soft); color: var(--ink); }
+.btn-confirm { background: var(--brand); color: white; }
+.btn-confirm.danger { background: var(--danger); }
+.modal-text { font-size: 13px; color: var(--ink); margin-bottom: 8px; }
+.toast { position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%); background: var(--ink); color: white; padding: 12px 20px; border-radius: 4px; font-size: 13px; opacity: 0; transition: opacity 0.2s; pointer-events: none; z-index: 1001; max-width: 90vw; text-align: center; }
+.toast.show { opacity: 1; }
+@media (min-width: 600px) { .hero-state { font-size: 46px; } }
+</style>
+</head>
+<body>
+<div class="app">
+  <div class="eyebrow">
+    <span>Pointage · AGL</span>
+    <span class="save-indicator" id="saveStatus">Sauvegardé</span>
+  </div>
+
+  <div class="hero">
+    <div class="hero-label">État actuel</div>
+    <div class="hero-state idle" id="heroState">Pas commencé</div>
+    <div class="hero-since" id="heroSince">&nbsp;</div>
+  </div>
+
+  <button class="primary-action" id="primaryBtn">Commencer le travail</button>
+  <button class="adjust-link" id="adjustBtn">Modifier l'heure du dernier pointage</button>
+
+  <div class="metrics">
+    <div class="metric" id="dayMetric">
+      <span class="metric-label">Aujourd'hui</span>
+      <span class="metric-pct" id="dayPct">0%</span>
+      <span class="metric-value"><span id="dayValue">0h 00</span> <span class="metric-target">/ <span id="dayTarget">8h 00</span></span></span>
+      <div class="metric-bar"><span id="dayBar" style="width: 0%"></span></div>
+    </div>
+    <div class="metric" id="weekMetric">
+      <span class="metric-label">Semaine <span id="weekNum"></span></span>
+      <span class="metric-pct" id="weekPct">0%</span>
+      <span class="metric-value"><span id="weekValue">0h 00</span> <span class="metric-target">/ 39h 00</span></span>
+      <div class="metric-bar"><span id="weekBar" style="width: 0%"></span></div>
+    </div>
+    <div class="metric" id="monthMetric">
+      <span class="metric-label" id="monthLabel">Ce mois</span>
+      <span class="metric-pct" id="monthPct">0%</span>
+      <span class="metric-value"><span id="monthValue">0h 00</span> <span class="metric-target">/ <span id="monthTarget">0h 00</span></span></span>
+      <div class="metric-bar"><span id="monthBar" style="width: 0%"></span></div>
+    </div>
+  </div>
+
+  <div class="section-head">
+    <span>Historique</span>
+    <button class="link" id="historyToggle">Tout afficher »</button>
+  </div>
+  <div class="history" id="history"></div>
+
+  <div class="actions">
+    <button id="addManualBtn">+ Ajout manuel</button>
+    <button id="exportBtn">↓ Exporter Excel</button>
+  </div>
+
+  <div class="footer-actions">
+    <button id="backupFileBtn">Sauvegarde (fichier)</button>
+    <button id="restoreFileBtn">Restaurer (fichier)</button>
+    <button id="backupTxtBtn">Sauvegarde (copier)</button>
+    <button class="danger" id="resetBtn">Tout effacer</button>
+  </div>
+</div>
+
+<div class="modal-overlay" id="modal"><div class="modal" id="modalContent"></div></div>
+<div class="toast" id="toast"></div>
+
+<script>
+const STORAGE_KEY = 'pointage-events-v1';
+const WEEKLY_TARGET_HOURS = 39;
+const SCHEDULE = { 0: 0, 1: 8, 2: 8, 3: 8, 4: 8, 5: 7, 6: 0 };
+const dailyTargetMin = date => (SCHEDULE[new Date(date).getDay()] || 0) * 60;
+
+// Données initiales (jeu 18, ven 19, lun 22, mar 23 juin 2026) — chargées seulement si le navigateur est vide
+const SEED = [
+  {"id":"j18-debut","type":"DEBUT","ts":"2026-06-18T06:05:00.000Z"},
+  {"id":"j18-pause","type":"PAUSE","ts":"2026-06-18T11:10:00.000Z"},
+  {"id":"j18-reprise","type":"REPRISE","ts":"2026-06-18T12:14:00.000Z"},
+  {"id":"j18-fin","type":"FIN","ts":"2026-06-18T16:00:00.000Z"},
+  {"id":"j19-debut","type":"DEBUT","ts":"2026-06-19T06:10:00.000Z"},
+  {"id":"j19-pause","type":"PAUSE","ts":"2026-06-19T11:15:00.000Z"},
+  {"id":"j19-reprise","type":"REPRISE","ts":"2026-06-19T12:14:00.000Z"},
+  {"id":"j19-fin","type":"FIN","ts":"2026-06-19T14:30:00.000Z"},
+  {"id":"j22-debut","type":"DEBUT","ts":"2026-06-22T06:14:00.000Z"},
+  {"id":"j22-pause","type":"PAUSE","ts":"2026-06-22T12:08:00.000Z"},
+  {"id":"j22-reprise","type":"REPRISE","ts":"2026-06-22T12:18:00.000Z"},
+  {"id":"j22-fin","type":"FIN","ts":"2026-06-22T15:42:00.000Z"},
+  {"id":"j23-debut","type":"DEBUT","ts":"2026-06-23T06:10:00.000Z"},
+  {"id":"j23-pause","type":"PAUSE","ts":"2026-06-23T11:00:00.000Z"},
+  {"id":"j23-reprise","type":"REPRISE","ts":"2026-06-23T12:00:00.000Z"},
+  {"id":"j23-fin","type":"FIN","ts":"2026-06-23T16:15:00.000Z"}
+];
+
+let events = [];
+let showAllHistory = false;
+
+const uid = () => Math.random().toString(36).slice(2, 11);
+const pad = n => String(n).padStart(2, '0');
+const fmtTime = d => { const dt = new Date(d); return `${pad(dt.getHours())}:${pad(dt.getMinutes())}`; };
+const fmtDayKey = d => { const dt = new Date(d); return `${dt.getFullYear()}-${pad(dt.getMonth()+1)}-${pad(dt.getDate())}`; };
+const todayKey = () => fmtDayKey(new Date());
+function fmtDateFull(d) {
+  const dt = new Date(d);
+  const J = ['Dimanche','Lundi','Mardi','Mercredi','Jeudi','Vendredi','Samedi'];
+  return `${J[dt.getDay()]} ${pad(dt.getDate())}/${pad(dt.getMonth()+1)}`;
+}
+function fmtHours(minutes) {
+  if (minutes <= 0) return '0h 00';
+  const h = Math.floor(minutes / 60);
+  const m = Math.floor(minutes % 60);
+  return `${h}h ${pad(m)}`;
+}
+function isoWeek(d) {
+  const dt = new Date(d); dt.setHours(0,0,0,0);
+  dt.setDate(dt.getDate() + 3 - ((dt.getDay() + 6) % 7));
+  const week1 = new Date(dt.getFullYear(), 0, 4);
+  return 1 + Math.round(((dt - week1) / 86400000 - 3 + ((week1.getDay() + 6) % 7)) / 7);
+}
+function weekKey(d) { const dt = new Date(d); return `${dt.getFullYear()}-W${pad(isoWeek(dt))}`; }
+function monthKey(d) { const dt = new Date(d); return `${dt.getFullYear()}-${pad(dt.getMonth()+1)}`; }
+
+const TYPE_LABEL = { DEBUT: 'Début', PAUSE: 'Pause déjeuner', REPRISE: 'Reprise', FIN: 'Fin de journée' };
+
+function load() {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (raw) {
+      events = JSON.parse(raw);
+    } else {
+      events = SEED.slice();
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(events));
+    }
+    events.sort((a,b) => new Date(a.ts) - new Date(b.ts));
+  } catch (e) { events = SEED.slice(); }
+}
+function save() {
+  const status = document.getElementById('saveStatus');
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(events));
+    status.textContent = 'Sauvegardé'; status.classList.remove('error');
+  } catch (e) {
+    status.textContent = 'Erreur'; status.classList.add('error');
+    toast('Erreur de sauvegarde');
+  }
+}
+
+function getCurrentState() {
+  if (events.length === 0) return { state: 'IDLE', lastEvent: null };
+  const last = events[events.length - 1];
+  const isToday = fmtDayKey(last.ts) === todayKey();
+  if (last.type === 'FIN') return isToday ? { state: 'FINISHED', lastEvent: last } : { state: 'IDLE', lastEvent: last };
+  if (last.type === 'DEBUT') return { state: 'WORKING_AM', lastEvent: last };
+  if (last.type === 'PAUSE') return { state: 'BREAK', lastEvent: last };
+  if (last.type === 'REPRISE') return { state: 'WORKING_PM', lastEvent: last };
+  return { state: 'IDLE', lastEvent: null };
+}
+function nextActionFor(state) {
+  switch (state) {
+    case 'IDLE': return { type: 'DEBUT', label: 'Commencer le travail', class: '' };
+    case 'WORKING_AM': return { type: 'PAUSE', label: 'Prendre ma pause déjeuner', class: 'warn' };
+    case 'BREAK': return { type: 'REPRISE', label: 'Reprendre le travail', class: 'success' };
+    case 'WORKING_PM': return { type: 'FIN', label: 'Terminer la journée', class: 'danger' };
+    case 'FINISHED': return { type: 'DEBUT', label: 'Reprendre (nouvelle session)', class: '' };
+  }
+}
+function minutesForDay(dayKey) {
+  const dayEvents = events.filter(e => fmtDayKey(e.ts) === dayKey).sort((a,b) => new Date(a.ts) - new Date(b.ts));
+  if (dayEvents.length === 0) return 0;
+  let total = 0, working = false, workStart = null;
+  for (const ev of dayEvents) {
+    if (ev.type === 'DEBUT' || ev.type === 'REPRISE') {
+      if (!working) { workStart = new Date(ev.ts); working = true; }
+    } else if (ev.type === 'PAUSE' || ev.type === 'FIN') {
+      if (working && workStart) { total += (new Date(ev.ts) - workStart) / 60000; working = false; workStart = null; }
+    }
+  }
+  if (working && workStart && dayKey === todayKey()) total += (new Date() - workStart) / 60000;
+  return Math.max(0, total);
+}
+function getAllDayKeys() { return [...new Set(events.map(e => fmtDayKey(e.ts)))].sort(); }
+function minutesForWeek(refDate) {
+  const wk = weekKey(refDate); let total = 0;
+  for (const dk of getAllDayKeys()) if (weekKey(dk + 'T12:00:00') === wk) total += minutesForDay(dk);
+  return total;
+}
+function minutesForMonth(refDate) {
+  const mk = monthKey(refDate); let total = 0;
+  for (const dk of getAllDayKeys()) if (monthKey(dk + 'T12:00:00') === mk) total += minutesForDay(dk);
+  return total;
+}
+function monthlyTargetMin(refDate) {
+  const year = refDate.getFullYear(), month = refDate.getMonth();
+  const lastDay = new Date(year, month + 1, 0).getDate();
+  let totalMin = 0;
+  for (let d = 1; d <= lastDay; d++) totalMin += dailyTargetMin(new Date(year, month, d));
+  return totalMin;
+}
+function colorClassForPct(pct) { if (pct >= 100) return 'met'; if (pct >= 70) return 'close'; return ''; }
+
+function render() {
+  const now = new Date();
+  const { state, lastEvent } = getCurrentState();
+  document.getElementById('weekNum').textContent = isoWeek(now);
+  const monthNames = ['Janvier','Février','Mars','Avril','Mai','Juin','Juillet','Août','Septembre','Octobre','Novembre','Décembre'];
+  document.getElementById('monthLabel').textContent = `${monthNames[now.getMonth()]} ${now.getFullYear()}`;
+  const heroState = document.getElementById('heroState');
+  const heroSince = document.getElementById('heroSince');
+  heroState.className = 'hero-state';
+  switch (state) {
+    case 'IDLE': heroState.textContent = 'Pas commencé'; heroState.classList.add('idle'); heroSince.innerHTML = '&nbsp;'; break;
+    case 'WORKING_AM': heroState.textContent = 'Au travail'; heroState.classList.add('working'); heroSince.textContent = `depuis ${fmtTime(lastEvent.ts)}`; break;
+    case 'BREAK': heroState.textContent = 'En pause'; heroState.classList.add('break'); heroSince.textContent = `depuis ${fmtTime(lastEvent.ts)}`; break;
+    case 'WORKING_PM': heroState.textContent = 'Au travail'; heroState.classList.add('working'); heroSince.textContent = `repris à ${fmtTime(lastEvent.ts)}`; break;
+    case 'FINISHED': heroState.textContent = 'Journée terminée'; heroState.classList.add('finished'); heroSince.textContent = `fin à ${fmtTime(lastEvent.ts)}`; break;
+  }
+  const action = nextActionFor(state);
+  const btn = document.getElementById('primaryBtn');
+  btn.textContent = action.label; btn.className = 'primary-action ' + action.class; btn.dataset.action = action.type;
+  const dayMin = minutesForDay(todayKey()), weekMin = minutesForWeek(now), monthMin = minutesForMonth(now);
+  const dayTargetMin = dailyTargetMin(now), weekTargetMin = WEEKLY_TARGET_HOURS * 60, monthTargetMin = monthlyTargetMin(now);
+  document.getElementById('dayValue').textContent = fmtHours(dayMin);
+  const dayMetric = document.getElementById('dayMetric');
+  if (dayTargetMin === 0) {
+    document.getElementById('dayTarget').textContent = 'Repos';
+    document.getElementById('dayPct').textContent = dayMin > 0 ? `+${fmtHours(dayMin)}` : '—';
+    document.getElementById('dayBar').style.width = '0%'; dayMetric.className = 'metric rest';
+  } else {
+    const dayPct = (dayMin / dayTargetMin) * 100;
+    document.getElementById('dayTarget').textContent = fmtHours(dayTargetMin);
+    document.getElementById('dayPct').textContent = `${Math.round(dayPct)}%`;
+    document.getElementById('dayBar').style.width = `${Math.min(100, dayPct)}%`;
+    dayMetric.className = 'metric ' + colorClassForPct(dayPct);
+  }
+  const weekPct = weekTargetMin > 0 ? (weekMin / weekTargetMin) * 100 : 0;
+  document.getElementById('weekValue').textContent = fmtHours(weekMin);
+  document.getElementById('weekPct').textContent = `${Math.round(weekPct)}%`;
+  document.getElementById('weekBar').style.width = `${Math.min(100, weekPct)}%`;
+  document.getElementById('weekMetric').className = 'metric ' + colorClassForPct(weekPct);
+  const monthPct = monthTargetMin > 0 ? (monthMin / monthTargetMin) * 100 : 0;
+  document.getElementById('monthValue').textContent = fmtHours(monthMin);
+  document.getElementById('monthTarget').textContent = fmtHours(monthTargetMin);
+  document.getElementById('monthPct').textContent = `${Math.round(monthPct)}%`;
+  document.getElementById('monthBar').style.width = `${Math.min(100, monthPct)}%`;
+  document.getElementById('monthMetric').className = 'metric ' + colorClassForPct(monthPct);
+  renderHistory();
+  document.getElementById('adjustBtn').style.display = lastEvent ? 'block' : 'none';
+}
+
+function renderHistory() {
+  const h = document.getElementById('history');
+  if (events.length === 0) {
+    h.innerHTML = '<div class="history-empty">Aucun pointage.<br>Appuie sur "Commencer le travail".</div>';
+    document.getElementById('historyToggle').style.display = 'none'; return;
+  }
+  document.getElementById('historyToggle').style.display = '';
+  document.getElementById('historyToggle').textContent = showAllHistory ? '« Réduire' : 'Tout afficher »';
+  const dayKeysDesc = getAllDayKeys().reverse();
+  const toShowDays = showAllHistory ? dayKeysDesc : dayKeysDesc.slice(0, 3);
+  let html = '';
+  for (const dk of toShowDays) {
+    const dayEvs = events.filter(e => fmtDayKey(e.ts) === dk).sort((a,b) => new Date(a.ts) - new Date(b.ts));
+    html += `<div class="day-block"><div class="day-block-head"><span>${fmtDateFull(dk + 'T12:00:00')}</span><span class="day-block-total">${fmtHours(minutesForDay(dk))}</span></div>`;
+    for (const ev of dayEvs) {
+      html += `<div class="history-row"><span class="history-time">${fmtTime(ev.ts)}</span><span class="history-type">${TYPE_LABEL[ev.type]}</span><button class="history-action" data-edit="${ev.id}">modifier</button></div>`;
+    }
+    html += '</div>';
+  }
+  h.innerHTML = html;
+  h.querySelectorAll('[data-edit]').forEach(btn => { btn.onclick = () => editEvent(btn.dataset.edit); });
+}
+
+function addEvent(type, ts = null) {
+  events.push({ id: uid(), type, ts: (ts || new Date()).toISOString() });
+  events.sort((a,b) => new Date(a.ts) - new Date(b.ts));
+  save(); render();
+  toast(`${TYPE_LABEL[type]} enregistré`);
+}
+function deleteEvent(id) { events = events.filter(e => e.id !== id); save(); render(); }
+
+const modal = document.getElementById('modal');
+const modalContent = document.getElementById('modalContent');
+function openModal(html) { modalContent.innerHTML = html; modal.classList.add('open'); }
+function closeModal() { modal.classList.remove('open'); }
+modal.addEventListener('click', e => { if (e.target === modal) closeModal(); });
+window.closeModal = closeModal;
+
+function tsToDatetimeLocal(ts) {
+  const d = new Date(ts);
+  return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+function editEvent(id) {
+  const ev = events.find(e => e.id === id);
+  if (!ev) return;
+  openModal(`<h2>Modifier le pointage</h2>
+    <label>Type</label>
+    <select id="m-type">
+      <option value="DEBUT" ${ev.type==='DEBUT'?'selected':''}>Début</option>
+      <option value="PAUSE" ${ev.type==='PAUSE'?'selected':''}>Pause déjeuner</option>
+      <option value="REPRISE" ${ev.type==='REPRISE'?'selected':''}>Reprise</option>
+      <option value="FIN" ${ev.type==='FIN'?'selected':''}>Fin de journée</option>
+    </select>
+    <label>Date et heure</label>
+    <input type="datetime-local" id="m-dt" value="${tsToDatetimeLocal(ev.ts)}">
+    <div class="modal-actions">
+      <button class="btn-cancel" onclick="closeModal()">Annuler</button>
+      <button class="btn-confirm danger" id="m-delete">Supprimer</button>
+      <button class="btn-confirm" id="m-save">Enregistrer</button>
+    </div>`);
+  document.getElementById('m-save').onclick = () => {
+    const newDt = document.getElementById('m-dt').value;
+    if (!newDt) { toast('Date invalide'); return; }
+    ev.type = document.getElementById('m-type').value;
+    ev.ts = new Date(newDt).toISOString();
+    events.sort((a,b) => new Date(a.ts) - new Date(b.ts));
+    save(); render(); closeModal(); toast('Modifié');
+  };
+  let delArmed = false;
+  document.getElementById('m-delete').onclick = () => {
+    const db = document.getElementById('m-delete');
+    if (!delArmed) { delArmed = true; db.textContent = 'Confirmer ?'; return; }
+    deleteEvent(id); closeModal(); toast('Supprimé');
+  };
+}
+function adjustLast() {
+  const { lastEvent } = getCurrentState();
+  if (!lastEvent) { toast('Rien à modifier'); return; }
+  editEvent(lastEvent.id);
+}
+function addManual() {
+  openModal(`<h2>Ajouter un pointage</h2>
+    <label>Type</label>
+    <select id="m-type">
+      <option value="DEBUT">Début</option>
+      <option value="PAUSE">Pause déjeuner</option>
+      <option value="REPRISE">Reprise</option>
+      <option value="FIN">Fin de journée</option>
+    </select>
+    <label>Date et heure</label>
+    <input type="datetime-local" id="m-dt" value="${tsToDatetimeLocal(new Date().toISOString())}">
+    <div class="modal-actions">
+      <button class="btn-cancel" onclick="closeModal()">Annuler</button>
+      <button class="btn-confirm" id="m-add">Ajouter</button>
+    </div>`);
+  document.getElementById('m-add').onclick = () => {
+    const dt = document.getElementById('m-dt').value;
+    if (!dt) { toast('Date invalide'); return; }
+    addEvent(document.getElementById('m-type').value, new Date(dt));
+    closeModal();
+  };
+}
+
+function confirmReset() {
+  openModal(`<h2 style="color: var(--danger);">Tout effacer ?</h2>
+    <p class="modal-text">Action <strong>irréversible</strong>. Tape <strong>EFFACER</strong> :</p>
+    <input type="text" id="m-confirm" placeholder="EFFACER">
+    <div class="modal-actions">
+      <button class="btn-cancel" onclick="closeModal()">Annuler</button>
+      <button class="btn-confirm danger" id="m-reset-go">Effacer</button>
+    </div>`);
+  document.getElementById('m-reset-go').onclick = () => {
+    if (document.getElementById('m-confirm').value !== 'EFFACER') { toast('Tape "EFFACER"'); return; }
+    events = []; save(); render(); closeModal(); toast('Effacé');
+  };
+}
+
+function exportExcel() {
+  if (events.length === 0) { toast('Aucune donnée à exporter'); return; }
+  const sortedEv = [...events].sort((a,b) => new Date(a.ts) - new Date(b.ts));
+  const pointages = [['Date', 'Jour', 'Heure', 'Type']];
+  for (const ev of sortedEv) {
+    const d = new Date(ev.ts);
+    pointages.push([`${pad(d.getDate())}/${pad(d.getMonth()+1)}/${d.getFullYear()}`, ['Dim','Lun','Mar','Mer','Jeu','Ven','Sam'][d.getDay()], fmtTime(ev.ts), TYPE_LABEL[ev.type]]);
+  }
+  const synthese = [['Date', 'Jour', 'Début', 'Pause', 'Reprise', 'Fin', 'Durée pause', 'Heures travaillées', 'Semaine']];
+  const dayKeys = getAllDayKeys();
+  for (const dk of dayKeys) {
+    const dayEvents = events.filter(e => fmtDayKey(e.ts) === dk).sort((a,b) => new Date(a.ts) - new Date(b.ts));
+    const debut = dayEvents.find(e => e.type === 'DEBUT');
+    const pause = dayEvents.find(e => e.type === 'PAUSE');
+    const reprise = dayEvents.find(e => e.type === 'REPRISE');
+    const fin = dayEvents.find(e => e.type === 'FIN');
+    const totalMin = minutesForDay(dk);
+    const pauseMin = (pause && reprise) ? (new Date(reprise.ts) - new Date(pause.ts)) / 60000 : 0;
+    const d = new Date(dk + 'T12:00:00');
+    synthese.push([`${pad(d.getDate())}/${pad(d.getMonth()+1)}/${d.getFullYear()}`, ['Dim','Lun','Mar','Mer','Jeu','Ven','Sam'][d.getDay()], debut?fmtTime(debut.ts):'', pause?fmtTime(pause.ts):'', reprise?fmtTime(reprise.ts):'', fin?fmtTime(fin.ts):'', pauseMin>0?fmtHours(pauseMin):'', fmtHours(totalMin), `S${pad(isoWeek(d))}`]);
+  }
+  synthese.push([]);
+  synthese.push(['SYNTHÈSE PAR SEMAINE','','','','','','','','']);
+  const weekKeys = [...new Set(dayKeys.map(dk => weekKey(dk + 'T12:00:00')))].sort();
+  for (const wk of weekKeys) {
+    let wkMin = 0;
+    for (const dk of dayKeys) if (weekKey(dk + 'T12:00:00') === wk) wkMin += minutesForDay(dk);
+    const ecart = wkMin - 39*60;
+    synthese.push([wk,'','','','','','',fmtHours(wkMin),`Écart ${ecart>=0?'+':'-'}${fmtHours(Math.abs(ecart))}`]);
+  }
+  const wb = XLSX.utils.book_new();
+  const ws1 = XLSX.utils.aoa_to_sheet(pointages);
+  const ws2 = XLSX.utils.aoa_to_sheet(synthese);
+  ws1['!cols'] = [{wch:12},{wch:6},{wch:8},{wch:18}];
+  ws2['!cols'] = [{wch:12},{wch:6},{wch:8},{wch:8},{wch:8},{wch:8},{wch:12},{wch:18},{wch:18}];
+  XLSX.utils.book_append_sheet(wb, ws1, 'Pointages');
+  XLSX.utils.book_append_sheet(wb, ws2, 'Synthèse jour');
+  const now = new Date();
+  XLSX.writeFile(wb, `Pointage_${now.getFullYear()}-${pad(now.getMonth()+1)}-${pad(now.getDate())}.xlsx`);
+  toast('Excel téléchargé');
+}
+
+function backupFile() {
+  if (events.length === 0) { toast('Aucune donnée'); return; }
+  const blob = new Blob([JSON.stringify(events, null, 2)], {type: 'application/json'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = `pointage-backup-${todayKey()}.json`;
+  a.click(); URL.revokeObjectURL(url);
+  toast('Fichier de sauvegarde téléchargé');
+}
+function restoreFile() {
+  const input = document.createElement('input');
+  input.type = 'file'; input.accept = '.json,application/json';
+  input.onchange = async () => {
+    const file = input.files[0]; if (!file) return;
+    const text = await file.text();
+    try {
+      const data = JSON.parse(text);
+      if (!Array.isArray(data)) throw new Error();
+      events = data; events.sort((a,b) => new Date(a.ts) - new Date(b.ts));
+      save(); render(); toast(`Restauré : ${data.length} pointages`);
+    } catch (e) { toast('Fichier invalide'); }
+  };
+  input.click();
+}
+function backupTxt() {
+  if (events.length === 0) { toast('Aucune donnée'); return; }
+  const json = JSON.stringify(events);
+  openModal(`<h2>Sauvegarde texte</h2>
+    <p class="modal-text">Copie ce texte et garde-le quelque part (mail, notes…) en secours.</p>
+    <textarea id="backup-area" style="height:130px;">${json}</textarea>
+    <div class="modal-actions">
+      <button class="btn-cancel" onclick="closeModal()">Fermer</button>
+      <button class="btn-confirm" id="b-copy">Copier</button>
+    </div>`);
+  const area = document.getElementById('backup-area');
+  area.focus(); area.select();
+  document.getElementById('b-copy').onclick = () => {
+    area.select();
+    if (navigator.clipboard) navigator.clipboard.writeText(json).then(() => toast('Copié !'));
+    else { document.execCommand('copy'); toast('Copié !'); }
+  };
+}
+
+let toastTimer;
+function toast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => t.classList.remove('show'), 2200);
+}
+
+document.getElementById('primaryBtn').onclick = () => addEvent(document.getElementById('primaryBtn').dataset.action);
+document.getElementById('adjustBtn').onclick = adjustLast;
+document.getElementById('addManualBtn').onclick = addManual;
+document.getElementById('exportBtn').onclick = exportExcel;
+document.getElementById('backupFileBtn').onclick = backupFile;
+document.getElementById('restoreFileBtn').onclick = restoreFile;
+document.getElementById('backupTxtBtn').onclick = backupTxt;
+document.getElementById('resetBtn').onclick = confirmReset;
+document.getElementById('historyToggle').onclick = () => { showAllHistory = !showAllHistory; renderHistory(); };
+
+load();
+render();
+setInterval(render, 60000);
+</script>
+</body>
+</html>
